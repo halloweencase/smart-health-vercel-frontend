@@ -103,7 +103,7 @@ const getNavigationItems = (role) => {
   }
 };
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://smart-health-render-backend.onrender.com/api';
 const TOKEN_KEY = 'smart_health_token';
 const USER_KEY = 'smart_health_user';
 
