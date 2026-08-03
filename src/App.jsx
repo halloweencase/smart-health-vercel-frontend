@@ -61,6 +61,7 @@ const routes = {
   profile: '/profile',
   settings: '/settings',
   statistics: '/statistics',
+  hospitalAdmins: '/hospital-admins',
   doctors: '/doctors',
   staff: '/staff',
   patients: '/patients',
@@ -140,7 +141,7 @@ async function authRequest(path, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok || data.success === false) {
-    throw new Error(data.message || 'Something went wrong');
+    throw new Error(data.message || `Request failed (${response.status}). Please try again.`);
   }
 
   return data;
@@ -163,7 +164,10 @@ async function apiRequest(path, options = {}) {
       clearSession();
       window.location.href = routes.login;
     }
-    throw new Error(data.message || 'Something went wrong');
+    const endpointHint = response.status === 404
+      ? `The requested API endpoint was not found (404): ${path}. Deploy the latest backend to Render.`
+      : `Request failed (${response.status}). Please try again.`;
+    throw new Error(data.message || endpointHint);
   }
 
   return data;
@@ -218,6 +222,7 @@ function App() {
       <Route path={routes.profile} element={<ProtectedRoute><ProfileScreen /></ProtectedRoute>} />
       <Route path={routes.settings} element={<ProtectedRoute><SettingsScreen /></ProtectedRoute>} />
       <Route path={routes.statistics} element={<ProtectedRoute><StatisticsScreen /></ProtectedRoute>} />
+      <Route path={routes.hospitalAdmins} element={<ProtectedRoute><HospitalAdminsScreen /></ProtectedRoute>} />
       <Route path={routes.doctors} element={<ProtectedRoute><DoctorsScreen /></ProtectedRoute>} />
       <Route path={routes.staff} element={<ProtectedRoute><StaffScreen /></ProtectedRoute>} />
       <Route path={routes.patients} element={<ProtectedRoute><PatientsScreen /></ProtectedRoute>} />
@@ -605,8 +610,8 @@ function RegisterScreen() {
     <PageShell title="Create Account" appNav={false}>
       <form className="form-page" onSubmit={handleSubmit}>
         <section className="auth-heading">
-          <h1>Set up your health profile</h1>
-          <p>Create a secure account to start storing reports and emergency details.</p>
+          <h1>Create your patient account</h1>
+          <p>This registration creates a patient account at your selected hospital.</p>
         </section>
         {status.message ? <StatusMessage type={status.type}>{status.message}</StatusMessage> : null}
         <Field label="Full name" hint="Enter patient name" icon={User} name="full_name" value={form.full_name} onChange={updateField} required />
@@ -1571,6 +1576,7 @@ function SuperAdminDashboard() {
 function StatisticsScreen() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     apiRequest('/superadmin/statistics')
@@ -1610,23 +1616,21 @@ function StatisticsScreen() {
           <div className="col-12 mt-4">
             <Card>
               <h3 className="mb-3">Users Breakdown by Role</h3>
-              <div className="row text-center">
-                <div className="col-md-3 mb-3">
-                  <h4>{stats.hospital_admins}</h4>
-                  <span className="text-muted">Hospital Admins</span>
-                </div>
-                <div className="col-md-3 mb-3">
-                  <h4>{stats.doctors}</h4>
-                  <span className="text-muted">Doctors</span>
-                </div>
-                <div className="col-md-3 mb-3">
-                  <h4>{stats.staff}</h4>
-                  <span className="text-muted">Staff</span>
-                </div>
-                <div className="col-md-3 mb-3">
-                  <h4>{stats.patients}</h4>
-                  <span className="text-muted">Patients</span>
-                </div>
+              <div className="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 text-center">
+                {[
+                  { label: 'Hospital Admins', count: stats.hospital_admins, path: routes.hospitalAdmins },
+                  { label: 'Doctors', count: stats.doctors, path: routes.doctors },
+                  { label: 'Staff', count: stats.staff, path: routes.staff },
+                  { label: 'Patients', count: stats.patients, path: routes.patients },
+                ].map((item) => (
+                  <div className="col" key={item.label}>
+                    <button className="role-summary-button" onClick={() => navigate(item.path)}>
+                      <h4>{item.count}</h4>
+                      <span>{item.label}</span>
+                      <small>View directory</small>
+                    </button>
+                  </div>
+                ))}
               </div>
             </Card>
           </div>
@@ -1674,6 +1678,16 @@ function HospitalAdminDashboard() {
     return (
       <PageShell title="Hospital Configuration">
         <div className="center-message">Loading settings...</div>
+      </PageShell>
+    );
+  }
+
+  if (!hosp) {
+    return (
+      <PageShell title="Hospital Configuration">
+        <StatusMessage type="error">
+          {status.message || 'Your hospital profile could not be found. Please contact the Super Admin to assign your account to a hospital.'}
+        </StatusMessage>
       </PageShell>
     );
   }
@@ -2093,17 +2107,63 @@ function UserManagementScreen({ role, title, icon: ScreenIcon }) {
   );
 }
 
-function DoctorsScreen() {
-  return <UserManagementScreen role="DOCTOR" title="Doctor Directory" icon={Stethoscope} />;
+function SuperAdminDirectoryScreen({ role, title }) {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    apiRequest(`/superadmin/users?role=${role}`)
+      .then((data) => setUsers(data.users || []))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [role]);
+
+  const deleteUser = async (user) => {
+    if (!window.confirm(`Delete ${user.full_name}? This cannot be undone.`)) return;
+    setError('');
+    setMessage('');
+    try {
+      const data = await apiRequest(`/superadmin/users/${user.id}`, { method: 'DELETE' });
+      setUsers((current) => current.filter((item) => item.id !== user.id));
+      setMessage(data.message || 'User deleted successfully');
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <PageShell title={title}>
+      <Card>
+        <h2 className="mb-4">{title}</h2>
+        {message && <StatusMessage type="success">{message}</StatusMessage>}
+        {loading ? <div className="center-message">Loading users...</div> : error ? (
+          <StatusMessage type="error">{error}</StatusMessage>
+        ) : users.length === 0 ? <div className="center-message">No {role.toLowerCase()}s found.</div> : (
+          <div className="table-responsive">
+            <table className="table table-hover align-middle mb-0">
+              <thead><tr><th>Name</th><th>Hospital</th><th>Email</th><th>Phone</th><th>Status</th><th>Registered</th><th>Action</th></tr></thead>
+              <tbody>{users.map((user) => (
+                <tr key={user.id}>
+                  <td><strong>{user.full_name}</strong></td><td>{user.hospital_name}</td><td>{user.email}</td><td>{user.phone}</td>
+                  <td><span className={`badge ${user.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>{user.status}</span></td>
+                  <td>{new Date(user.created_at).toLocaleDateString()}</td>
+                  <td><button className="btn btn-sm btn-outline-danger" onClick={() => deleteUser(user)}>Delete</button></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </PageShell>
+  );
 }
 
-function StaffScreen() {
-  return <UserManagementScreen role="STAFF" title="Staff Directory" icon={UserPlus} />;
-}
-
-function PatientsScreen() {
-  return <UserManagementScreen role="PATIENT" title="Patient Directory" icon={User} />;
-}
+function HospitalAdminsScreen() { return <SuperAdminDirectoryScreen role="HOSPITAL_ADMIN" title="Hospital Admins Directory" />; }
+function DoctorsScreen() { return getStoredUser()?.role === 'SUPER_ADMIN' ? <SuperAdminDirectoryScreen role="DOCTOR" title="Doctors Directory" /> : <UserManagementScreen role="DOCTOR" title="Doctor Directory" icon={Stethoscope} />; }
+function StaffScreen() { return getStoredUser()?.role === 'SUPER_ADMIN' ? <SuperAdminDirectoryScreen role="STAFF" title="Staff Directory" /> : <UserManagementScreen role="STAFF" title="Staff Directory" icon={UserPlus} />; }
+function PatientsScreen() { return getStoredUser()?.role === 'SUPER_ADMIN' ? <SuperAdminDirectoryScreen role="PATIENT" title="Patients Directory" /> : <UserManagementScreen role="PATIENT" title="Patient Directory" icon={User} />; }
 
 // ==========================================
 // DOCTOR DASHBOARD & OPERATIONS
