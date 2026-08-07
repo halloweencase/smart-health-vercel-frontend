@@ -1,5 +1,11 @@
 import React from 'react';
 import {
+  FaEdit,
+  FaUserPlus,
+  FaKey,
+  FaTrashAlt,
+} from "react-icons/fa";
+import {
   Bell,
   CalendarDays,
   CheckCircle,
@@ -45,412 +51,21 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Route, Routes, useNavigate, useLocation } from 'react-router-dom';
-
-const routes = {
-  splash: '/splash',
-  login: '/login',
-  register: '/register',
-  forgotPassword: '/forgot-password',
-  dashboard: '/dashboard',
-  records: '/records',
-  uploadReport: '/upload-report',
-  reportDetails: '/report-details',
-  health: '/health',
-  appointments: '/appointments',
-  ai: '/ai',
-  profile: '/profile',
-  settings: '/settings',
-  statistics: '/statistics',
-  hospitalAdmins: '/hospital-admins',
-  doctors: '/doctors',
-  staff: '/staff',
-  patients: '/patients',
-};
-
-const getNavigationItems = (role) => {
-  switch (role) {
-    case 'SUPER_ADMIN':
-      return [
-        { label: 'Hospitals', path: routes.dashboard, icon: Home },
-        { label: 'Statistics', path: routes.statistics, icon: Activity },
-      ];
-    case 'HOSPITAL_ADMIN':
-      return [
-        { label: 'Hospital Profile', path: routes.dashboard, icon: Home },
-        { label: 'Doctors', path: routes.doctors, icon: Stethoscope },
-        { label: 'Staff', path: routes.staff, icon: UserPlus },
-        { label: 'Patients', path: routes.patients, icon: User },
-      ];
-    case 'DOCTOR':
-      return [
-        { label: 'Patients', path: routes.dashboard, icon: Home },
-        { label: 'Profile', path: routes.profile, icon: User },
-      ];
-    case 'STAFF':
-      return [
-        { label: 'Patients', path: routes.dashboard, icon: Home },
-        { label: 'Appointments', path: routes.appointments, icon: CalendarDays },
-        { label: 'Profile', path: routes.profile, icon: User },
-      ];
-    case 'PATIENT':
-    default:
-      return [
-        { label: 'Home', path: routes.dashboard, icon: Home },
-        { label: 'Documents', path: routes.records, icon: Folders },
-        { label: 'Visits', path: routes.appointments, icon: CalendarDays },
-        { label: 'Profile', path: routes.profile, icon: User },
-        { label: 'Settings', path: routes.settings, icon: Settings },
-      ];
-  }
-};
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://smart-health-render-backend.onrender.com/api';
-const TOKEN_KEY = 'smart_health_token';
-const USER_KEY = 'smart_health_user';
-
-const getStoredToken = () => localStorage.getItem(TOKEN_KEY);
-
-const getStoredUser = () => {
-  try {
-    return JSON.parse(localStorage.getItem(USER_KEY) || 'null');
-  } catch {
-    return null;
-  }
-};
-
-const saveSession = ({ token, user }) => {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
-  window.dispatchEvent(new Event('smart-health-auth'));
-};
-
-const clearSession = () => {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
-  window.dispatchEvent(new Event('smart-health-auth'));
-};
-
-async function authRequest(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  });
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok || data.success === false) {
-    throw new Error(data.message || `Request failed (${response.status}). Please try again.`);
-  }
-
-  return data;
-}
-
-async function apiRequest(path, options = {}) {
-  const token = getStoredToken();
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': token ? `Bearer ${token}` : '',
-      ...options.headers,
-    },
-    ...options,
-  });
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok || data.success === false) {
-    if (response.status === 401) {
-      clearSession();
-      window.location.href = routes.login;
-    }
-    const endpointHint = response.status === 404
-      ? `The requested API endpoint was not found (404): ${path}. Deploy the latest backend to Render.`
-      : `Request failed (${response.status}). Please try again.`;
-    throw new Error(data.message || endpointHint);
-  }
-
-  return data;
-}
-
-const handleFileUpload = async (event, callback, setUploadingState) => {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  setUploadingState(true);
-  const formData = new FormData();
-  formData.append('file', file);
-
-  try {
-    const token = localStorage.getItem('smart_health_token');
-    const response = await fetch(`${API_BASE_URL}/upload`, {
-      method: 'POST',
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : '',
-      },
-      body: formData,
-    });
-    const data = await response.json();
-    if (data.success) {
-      callback(data.file_url);
-    } else {
-      alert(data.message || 'File upload failed');
-    }
-  } catch (error) {
-    console.error('Error uploading file:', error);
-    alert('Error uploading file from local');
-  } finally {
-    setUploadingState(false);
-  }
-};
+import { routes, getNavigationItems } from './constants/routes';
+import { API_BASE_URL, apiRequest, authRequest, clearSession, getStoredToken, getStoredUser, handleFileUpload, saveSession } from './services/api';
+import { AppLogo, Card, Field, PrimaryButton, StatusMessage } from './components/ui';
+import { PageShell, ProtectedRoute, useStoredUser } from './components/layout';
+import ProfilePage from './pages/ProfilePage';
+import AppRoutes from './routes';
 
 function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<ProtectedRoute><DashboardScreen /></ProtectedRoute>} />
-      <Route path={routes.splash} element={<SplashScreen />} />
-      <Route path={routes.login} element={<LoginScreen />} />
-      <Route path={routes.register} element={<RegisterScreen />} />
-      <Route path={routes.forgotPassword} element={<ForgotPasswordScreen />} />
-      <Route path={routes.dashboard} element={<ProtectedRoute><DashboardScreen /></ProtectedRoute>} />
-      <Route path={routes.records} element={<ProtectedRoute><RecordsScreen /></ProtectedRoute>} />
-      <Route path={routes.uploadReport} element={<ProtectedRoute><UploadReportScreen /></ProtectedRoute>} />
-      <Route path={routes.reportDetails} element={<ProtectedRoute><ReportDetailsScreen /></ProtectedRoute>} />
-      <Route path={routes.health} element={<ProtectedRoute><HealthScreen /></ProtectedRoute>} />
-      <Route path={routes.appointments} element={<ProtectedRoute><AppointmentsScreen /></ProtectedRoute>} />
-      <Route path={routes.ai} element={<ProtectedRoute><AiAssistantScreen /></ProtectedRoute>} />
-      <Route path={routes.profile} element={<ProtectedRoute><ProfileScreen /></ProtectedRoute>} />
-      <Route path={routes.settings} element={<ProtectedRoute><SettingsScreen /></ProtectedRoute>} />
-      <Route path={routes.statistics} element={<ProtectedRoute><StatisticsScreen /></ProtectedRoute>} />
-      <Route path={routes.hospitalAdmins} element={<ProtectedRoute><HospitalAdminsScreen /></ProtectedRoute>} />
-      <Route path={routes.doctors} element={<ProtectedRoute><DoctorsScreen /></ProtectedRoute>} />
-      <Route path={routes.staff} element={<ProtectedRoute><StaffScreen /></ProtectedRoute>} />
-      <Route path={routes.patients} element={<ProtectedRoute><PatientsScreen /></ProtectedRoute>} />
-    </Routes>
-  );
-}
-
-function ProtectedRoute({ children }) {
-  const navigate = useNavigate();
-  const [token, setToken] = useState(getStoredToken());
-
-  useEffect(() => {
-    const syncAuth = () => setToken(getStoredToken());
-    window.addEventListener('smart-health-auth', syncAuth);
-    window.addEventListener('storage', syncAuth);
-    return () => {
-      window.removeEventListener('smart-health-auth', syncAuth);
-      window.removeEventListener('storage', syncAuth);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!token) {
-      navigate(routes.login, { replace: true });
-    }
-  }, [navigate, token]);
-
-  return token ? children : null;
-}
-
-function useStoredUser() {
-  const [user, setUser] = useState(getStoredUser());
-
-  useEffect(() => {
-    const syncUser = () => setUser(getStoredUser());
-    window.addEventListener('smart-health-auth', syncUser);
-    window.addEventListener('storage', syncUser);
-    return () => {
-      window.removeEventListener('smart-health-auth', syncUser);
-      window.removeEventListener('storage', syncUser);
-    };
-  }, []);
-
-  return user;
-}
-
-function PageShell({ title, actions, children, showDrawer = false, bottomNavIndex = null, appNav = true }) {
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const user = useStoredUser();
-
-  const isPatient = user?.role === 'PATIENT';
-  const finalBottomNavIndex = isPatient ? bottomNavIndex : null;
-
-  return (
-    <div className={`app-screen ${appNav ? 'has-desktop-nav' : 'plain-shell'}`}>
-      {appNav ? <DesktopSidebar /> : null}
-      <div className="page-workspace">
-        <header className="app-bar">
-          <div className="bar-side">
-            {appNav ? (
-            <button className="icon-btn" type="button" aria-label="Open menu" onClick={() => setDrawerOpen(true)}>
-              <Menu size={22} />
-            </button>
-          ) : null}
-          </div>
-          <div className="title-block">
-            <h1>{title}</h1>
-            {appNav ? <p>Smart Health Record Management System</p> : null}
-          </div>
-          <div className="bar-side justify-content-end">{actions}</div>
-        </header>
-
-        {appNav ? <AppDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} /> : null}
-
-        <main className={finalBottomNavIndex === null ? 'content' : 'content with-bottom-nav'}>{children}</main>
-
-        {finalBottomNavIndex !== null ? <BottomNav currentIndex={finalBottomNavIndex} /> : null}
-      </div>
-    </div>
-  );
-}
-
-function DesktopSidebar() {
-  const navigate = useNavigate();
-  const user = useStoredUser();
-  const navItemsList = getNavigationItems(user?.role);
-
-  const handleLogout = () => {
-    clearSession();
-    navigate(routes.login, { replace: true });
-  };
-
-  return (
-    <aside className="desktop-sidebar">
-      <Link to={routes.dashboard} className="desktop-brand">
-        <span className="brand-avatar">
-          <Heart size={22} fill="currentColor" />
-        </span>
-        <div>
-          <h2>Smart Health</h2>
-          <p>{user?.role?.replace('_', ' ') || 'Workspace'}</p>
-        </div>
-      </Link>
-      <nav className="desktop-nav">
-        {navItemsList.map((item) => (
-          <NavLink key={item.path} to={item.path} className="desktop-nav-link">
-            <item.icon size={20} />
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
-      </nav>
-      <div className="sidebar-status">
-        <ShieldCheck size={20} />
-        <div>
-          <strong>Secure records</strong>
-          <span>Private patient access</span>
-        </div>
-      </div>
-      <button className="logout-link" type="button" onClick={handleLogout}>
-        <LogOut size={20} />
-        <span>Logout</span>
-      </button>
-    </aside>
-  );
-}
-
-function AppDrawer({ open, onClose }) {
-  const navigate = useNavigate();
-  const user = useStoredUser();
-  const navItemsList = getNavigationItems(user?.role);
-
-  const handleLogout = () => {
-    clearSession();
-    onClose();
-    navigate(routes.login, { replace: true });
-  };
-
-  return (
-    <>
-      <div className={`drawer-scrim ${open ? 'show' : ''}`} onClick={onClose} />
-      <aside className={`app-drawer ${open ? 'open' : ''}`} aria-hidden={!open}>
-        <div className="drawer-header">
-          <span className="brand-avatar">
-            <Heart size={22} fill="currentColor" />
-          </span>
-          <div>
-            <h2>Smart Health</h2>
-            <p>{user?.role?.replace('_', ' ') || 'Workspace'}</p>
-          </div>
-          <button className="icon-btn ms-auto" type="button" aria-label="Close menu" onClick={onClose}>
-            <X size={20} />
-          </button>
-        </div>
-        <div className="drawer-divider" />
-        <nav className="drawer-links">
-          {navItemsList.map((item) => (
-            <NavLink key={item.path} to={item.path} onClick={onClose} className="drawer-link">
-              <item.icon size={22} />
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
-          <button className="drawer-link drawer-logout" type="button" onClick={handleLogout}>
-            <LogOut size={22} />
-            <span>Logout</span>
-          </button>
-        </nav>
-      </aside>
-    </>
-  );
-}
-
-function BottomNav({ currentIndex }) {
-  const user = useStoredUser();
-  const navItemsList = getNavigationItems(user?.role);
-
-  return (
-    <nav className="bottom-nav">
-      {navItemsList.map((item, index) => (
-        <NavLink key={item.path} to={item.path} className={`bottom-nav-item ${index === currentIndex ? 'active' : ''}`}>
-          <item.icon size={22} />
-          <span>{item.label}</span>
-        </NavLink>
-      ))}
-    </nav>
-  );
-}
-
-function AppLogo({ size = 90 }) {
-  return (
-    <div className="app-logo">
-      <Heart size={size} fill="currentColor" strokeWidth={1.8} />
-      <h2>Smart Health</h2>
-    </div>
-  );
-}
-
-function PrimaryButton({ children, icon: Icon, onClick, type = 'button', disabled = false }) {
-  return (
-    <button className="primary-btn" type={type} onClick={onClick} disabled={disabled}>
-      {Icon ? <Icon size={20} /> : null}
-      <span>{children}</span>
-    </button>
-  );
-}
-
-function Card({ children, className = '', onClick }) {
-  const Component = onClick ? 'button' : 'div';
-  return (
-    <Component type={onClick ? 'button' : undefined} onClick={onClick} className={`custom-card ${className}`}>
-      {children}
-    </Component>
-  );
-}
-
-function Field({ label, hint, icon: Icon, type = 'text', rows, value, onChange, name, required = false }) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <div className={`field-control ${rows ? 'align-items-start' : ''}`}>
-        <Icon className={rows ? 'mt-2' : ''} size={22} />
-        {rows ? (
-          <textarea rows={rows} placeholder={hint} value={value} onChange={onChange} name={name} required={required} />
-        ) : (
-          <input type={type} placeholder={hint} value={value} onChange={onChange} name={name} required={required} />
-        )}
-      </div>
-    </label>
-  );
+  return <AppRoutes screens={{
+    SplashScreen, LoginScreen, RegisterScreen, ForgotPasswordScreen,
+    DashboardScreen, RecordsScreen, UploadReportScreen, ReportDetailsScreen,
+    HealthScreen, AppointmentsScreen, AiAssistantScreen, ProfilePage,
+    SettingsScreen, StatisticsScreen, HospitalAdminsScreen, DoctorsScreen,
+    StaffScreen, PatientsScreen,
+  }} />;
 }
 
 function SplashScreen() {
@@ -507,10 +122,10 @@ function LoginScreen() {
   return (
     <AuthLayout>
       <form className="auth-cardless" onSubmit={handleSubmit}>
-        <AppLogo size={72} />
+        <AppLogo size={74} />
         <section className="auth-heading">
-          <h1>Welcome back</h1>
-          <p>Sign in to manage reports, reminders, and health history.</p>
+          <h3 className='text-center'>Login</h3>
+          <p className='text-center'>Sign in to manage reports, reminders, and health history.</p>
         </section>
         {status.message ? <StatusMessage type={status.type}>{status.message}</StatusMessage> : null}
         <Field label="Email" hint="patient@example.com" icon={Mail} type="email" name="email" value={form.email} onChange={updateField} required />
@@ -521,7 +136,7 @@ function LoginScreen() {
         <PrimaryButton icon={LogIn} type="submit" disabled={isSubmitting}>{isSubmitting ? 'Logging in...' : 'Login'}</PrimaryButton>
         <p className="auth-switch">
           New to Smart Health?
-          <Link to={routes.register}>Create account</Link>
+          <Link to={routes.register}>Register</Link>
         </p>
         <div className="privacy-note">
           <ShieldCheck size={22} />
@@ -638,10 +253,6 @@ function RegisterScreen() {
       </form>
     </PageShell>
   );
-}
-
-function StatusMessage({ type, children }) {
-  return <div className={`status-message ${type === 'error' ? 'error' : 'success'}`}>{children}</div>;
 }
 
 function ForgotPasswordScreen() {
@@ -1035,6 +646,7 @@ function HealthScreen() {
               <div>
                 <h3>{metric.value}</h3>
                 <p>{metric.label}</p>
+                {metrics?.measured_at && <small className="text-muted d-block mt-1">Measured on {new Date(metrics.measured_at).toLocaleString()}</small>}
               </div>
             </Card>
           ))}
@@ -1046,16 +658,19 @@ function HealthScreen() {
 
 function AppointmentsScreen() {
   const [appointments, setAppointments] = useState([]);
+  const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiRequest('/patient/appointments')
-      .then(data => {
-        if (data.success) {
-          setAppointments(data.appointments || []);
-        }
+    Promise.all([
+      apiRequest('/patient/appointments'),
+      apiRequest('/patient/visits'),
+    ])
+      .then(([appointmentData, visitData]) => {
+        setAppointments(appointmentData.appointments || []);
+        setVisits(visitData.visits || []);
       })
-      .catch(err => console.error("Error loading patient appointments:", err))
+      .catch(err => console.error("Error loading patient visits:", err))
       .finally(() => setLoading(false));
   }, []);
 
@@ -1063,23 +678,32 @@ function AppointmentsScreen() {
     <PageShell title="Appointments" bottomNavIndex={2}>
       {loading ? (
         <div className="center-message">Loading appointments...</div>
-      ) : appointments.length === 0 ? (
-        <div className="center-message">No scheduled appointments.</div>
+      ) : appointments.length === 0 && visits.length === 0 ? (
+        <div className="center-message">No visits recorded yet.</div>
       ) : (
-        appointments.map((visit) => (
-          <Card key={visit.appointment_id} className="visit-card">
-            <span className="icon-circle primary">
-              <Stethoscope size={22} />
-            </span>
-            <div>
-              <h3>{visit.doctor_name}</h3>
-              <p>{new Date(visit.appointment_date).toLocaleString()}</p>
-              <span className={`badge ${visit.status === 'scheduled' ? 'bg-primary' : visit.status === 'completed' ? 'bg-success' : 'bg-secondary'}`}>
-                {visit.status}
-              </span>
-            </div>
-          </Card>
-        ))
+        <>
+          {visits.map((visit) => (
+            <Card key={`visit-${visit.visit_id}`} className="visit-card">
+              <span className="icon-circle success"><NotebookText size={22} /></span>
+              <div>
+                <h3>Visit Record</h3>
+                <p>{new Date(visit.visit_date).toLocaleString()}</p>
+                <p className="mb-1">{visit.description}</p>
+                <small className="text-muted">Added by {visit.created_by_name}</small>
+              </div>
+            </Card>
+          ))}
+          {appointments.map((visit) => (
+            <Card key={`appointment-${visit.appointment_id}`} className="visit-card">
+              <span className="icon-circle primary"><Stethoscope size={22} /></span>
+              <div>
+                <h3>{visit.doctor_name}</h3>
+                <p>{new Date(visit.appointment_date).toLocaleString()}</p>
+                <span className={`badge ${visit.status === 'scheduled' ? 'bg-primary' : visit.status === 'completed' ? 'bg-success' : 'bg-secondary'}`}>{visit.status}</span>
+              </div>
+            </Card>
+          ))}
+        </>
       )}
     </PageShell>
   );
@@ -1134,6 +758,7 @@ function SuperAdminDashboard() {
   const [showAdminForm, setShowAdminForm] = useState(false);
   const [showResetForm, setShowResetForm] = useState(false);
   const [selectedHospital, setSelectedHospital] = useState(null);
+  const [editingAdmin, setEditingAdmin] = useState(false);
   const [status, setStatus] = useState({ type: '', message: '' });
   const [resetForm, setResetForm] = useState({ password: '' });
 
@@ -1214,16 +839,37 @@ function SuperAdminDashboard() {
     e.preventDefault();
     setStatus({ type: '', message: '' });
     try {
-      await apiRequest('/superadmin/hospital-admin', {
-        method: 'POST',
+      await apiRequest(editingAdmin
+        ? `/superadmin/hospitals/${selectedHospital.hospital_id}/admin`
+        : '/superadmin/hospital-admin', {
+        method: editingAdmin ? 'PUT' : 'POST',
         body: JSON.stringify({
           ...adminForm,
-          hospital_id: selectedHospital.hospital_id,
+          ...(!editingAdmin && { hospital_id: selectedHospital.hospital_id }),
         }),
       });
-      setStatus({ type: 'success', message: `Administrator assigned to ${selectedHospital.hospital_name}!` });
+      setStatus({ type: 'success', message: editingAdmin
+        ? `Administrator for ${selectedHospital.hospital_name} updated successfully!`
+        : `Administrator assigned to ${selectedHospital.hospital_name}!` });
       setShowAdminForm(false);
+      setEditingAdmin(false);
       setAdminForm({ full_name: '', email: '', phone: '', password: '' });
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message });
+    }
+  };
+
+  const openAdminForm = async (hospital) => {
+    setStatus({ type: '', message: '' });
+    setSelectedHospital(hospital);
+    try {
+      const data = await apiRequest(`/superadmin/hospitals/${hospital.hospital_id}/admin`);
+      const admin = data.admin;
+      setEditingAdmin(Boolean(admin));
+      setAdminForm(admin
+        ? { full_name: admin.full_name, email: admin.email, phone: admin.phone, password: '' }
+        : { full_name: '', email: hospital.email || '', phone: hospital.phone || '', password: '' });
+      setShowAdminForm(true);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
     }
@@ -1407,8 +1053,8 @@ function SuperAdminDashboard() {
       {showAdminForm && selectedHospital && (
         <Card className="mb-4">
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h3>Assign Admin for {selectedHospital.hospital_name}</h3>
-            <button className="icon-btn text-danger" onClick={() => setShowAdminForm(false)}><X size={20} /></button>
+            <h3>{editingAdmin ? 'Edit Admin' : 'Assign Admin'} for {selectedHospital.hospital_name}</h3>
+            <button className="icon-btn text-danger" onClick={() => { setShowAdminForm(false); setEditingAdmin(false); }}><X size={20} /></button>
           </div>
           <form onSubmit={handleAdminSubmit} className="row g-3">
             <div className="col-md-6">
@@ -1442,17 +1088,17 @@ function SuperAdminDashboard() {
               />
             </div>
             <div className="col-md-6">
-              <label className="form-label">Password</label>
+              <label className="form-label">Password{editingAdmin && ' (leave blank to keep current password)'}</label>
               <input
                 type="password"
                 className="form-control"
                 value={adminForm.password}
                 onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
-                required
+                required={!editingAdmin}
               />
             </div>
             <div className="col-12 mt-3 text-end">
-              <button type="submit" className="primary-btn" style={{ width: 'auto', padding: '0 24px' }}>Create Admin</button>
+              <button type="submit" className="primary-btn" style={{ width: 'auto', padding: '0 24px' }}>{editingAdmin ? 'Update Admin' : 'Create Admin'}</button>
             </div>
           </form>
         </Card>
@@ -1519,50 +1165,54 @@ function SuperAdminDashboard() {
                       {h.status.toUpperCase()}
                     </button>
                   </td>
-                  <td>
-                    <div className="d-flex gap-2">
-                      <button
-                        className="btn btn-sm btn-outline-primary"
-                        onClick={() => {
-                          setSelectedHospital(h);
-                          setHospForm({ ...h });
-                          setShowAddForm(true);
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="btn btn-sm btn-outline-info"
-                        onClick={() => {
-                          setSelectedHospital(h);
-                          setAdminForm({
-                            full_name: '',
-                            email: h.email || '',
-                            phone: h.phone || '',
-                            password: '',
-                          });
-                          setShowAdminForm(true);
-                        }}
-                      >
-                        Assign Admin
-                      </button>
-                      <button
-                        className="btn btn-sm btn-outline-warning"
-                        onClick={() => {
-                          setSelectedHospital(h);
-                          setShowResetForm(true);
-                        }}
-                      >
-                        Reset PW
-                      </button>
-                      <button
-                        className="btn btn-sm btn-outline-danger"
-                        onClick={() => handleDelete(h.hospital_id)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+                 <td>
+  <div className="d-flex gap-2 justify-content-center">
+
+    {/* Edit */}
+    <button
+      className="btn btn-sm btn-outline-primary"
+      title="Edit Hospital"
+      onClick={() => {
+        setSelectedHospital(h);
+        setHospForm({ ...h });
+        setShowAddForm(true);
+      }}
+    >
+      <FaEdit />
+    </button>
+
+    {/* Assign Admin */}
+    <button
+      className="btn btn-sm btn-outline-info"
+      title="Assign or Edit Admin"
+      onClick={() => openAdminForm(h)}
+    >
+      <FaUserPlus />
+    </button>
+
+    {/* Reset Password */}
+    <button
+      className="btn btn-sm btn-outline-warning"
+      title="Reset Password"
+      onClick={() => {
+        setSelectedHospital(h);
+        setShowResetForm(true);
+      }}
+    >
+      <FaKey />
+    </button>
+
+    {/* Delete */}
+    <button
+      className="btn btn-sm btn-outline-danger"
+      title="Delete Hospital"
+      onClick={() => handleDelete(h.hospital_id)}
+    >
+      <FaTrashAlt />
+    </button>
+
+  </div>
+</td>
                 </tr>
               ))}
             </tbody>
@@ -2639,30 +2289,39 @@ function StaffDashboard() {
   const [patients, setPatients] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [appointments, setAppointments] = useState([]);
+  const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', message: '' });
   const [showAddForm, setShowAddForm] = useState(false);
   const [showReportForm, setShowReportForm] = useState(false);
   const [showApptForm, setShowApptForm] = useState(false);
+  const [showVisitForm, setShowVisitForm] = useState(false);
+  const [showHealthForm, setShowHealthForm] = useState(false);
   const [selectedPat, setSelectedPat] = useState(null);
+  const [actionPatient, setActionPatient] = useState(null);
+  const [patientSearch, setPatientSearch] = useState('');
 
   // Forms
   const [patForm, setPatForm] = useState({ full_name: '', email: '', phone: '', password: '' });
   const [reportForm, setReportForm] = useState({ title: '', category: 'Lab Report', notes: '', file_url: '' });
   const [apptForm, setApptForm] = useState({ doctor_id: '', appointment_date: '' });
+  const [visitForm, setVisitForm] = useState({ visit_date: '', description: '' });
+  const [healthForm, setHealthForm] = useState({ heart_rate: '', blood_sugar: '', blood_pressure: '', bmi: '', measured_at: '' });
   const [fileUploading, setFileUploading] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [patData, apptData, docData] = await Promise.all([
+      const [patData, apptData, docData, visitData] = await Promise.all([
         apiRequest('/staff/patients').catch(() => ({ patients: [] })),
         apiRequest('/staff/appointments').catch(() => ({ appointments: [] })),
         apiRequest('/staff/doctors').catch(() => ({ doctors: [] })),
+        apiRequest('/staff/visits').catch(() => ({ visits: [] })),
       ]);
       setPatients(patData.patients || []);
       setAppointments(apptData.appointments || []);
       setDoctors(docData.doctors || []);
+      setVisits(visitData.visits || []);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
     } finally {
@@ -2750,6 +2409,52 @@ function StaffDashboard() {
       setStatus({ type: 'error', message: err.message });
     }
   };
+
+  const handleVisitSubmit = async (e) => {
+    e.preventDefault();
+    setStatus({ type: '', message: '' });
+    try {
+      await apiRequest('/staff/visits', {
+        method: 'POST',
+        body: JSON.stringify({ ...visitForm, patient_id: selectedPat.id }),
+      });
+      setStatus({ type: 'success', message: `Visit added for ${selectedPat.full_name}!` });
+      setShowVisitForm(false);
+      setVisitForm({ visit_date: '', description: '' });
+      loadData();
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message });
+    }
+  };
+
+  const handleHealthSubmit = async (e) => {
+    e.preventDefault();
+    setStatus({ type: '', message: '' });
+    try {
+      await apiRequest('/staff/metrics', { method: 'POST', body: JSON.stringify({ ...healthForm, patient_id: selectedPat.id }) });
+      setStatus({ type: 'success', message: `Health tracking added for ${selectedPat.full_name}!` });
+      setShowHealthForm(false);
+      setHealthForm({ heart_rate: '', blood_sugar: '', blood_pressure: '', bmi: '', measured_at: '' });
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message });
+    }
+  };
+
+  const handlePatientDelete = async (patient) => {
+    if (!window.confirm(`Delete ${patient.full_name}? This also permanently removes their documents and visit history.`)) return;
+    try {
+      await apiRequest(`/staff/patient/${patient.id}`, { method: 'DELETE' });
+      setStatus({ type: 'success', message: 'Patient deleted successfully!' });
+      loadData();
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message });
+    }
+  };
+
+  const filteredPatients = patients.filter((patient) => {
+    const search = patientSearch.trim().toLowerCase();
+    return !search || patient.full_name.toLowerCase().includes(search) || patient.phone.toLowerCase().includes(search);
+  });
 
   return (
     <PageShell title="Staff Desk">
@@ -2853,12 +2558,53 @@ function StaffDashboard() {
               </form>
             )}
 
+            {showVisitForm && selectedPat && (
+              <form onSubmit={handleVisitSubmit} className="row g-2 mb-3 bg-light p-3 rounded">
+                <h5>Add Visit for {selectedPat.full_name}</h5>
+                <div className="col-md-5">
+                  <label className="form-label">Visit Date</label>
+                  <input type="datetime-local" className="form-control" value={visitForm.visit_date} onChange={e => setVisitForm({ ...visitForm, visit_date: e.target.value })} required />
+                </div>
+                <div className="col-md-7">
+                  <label className="form-label">Description</label>
+                  <textarea className="form-control" rows="2" placeholder="Reason for visit, services provided, or notes" value={visitForm.description} onChange={e => setVisitForm({ ...visitForm, description: e.target.value })} required />
+                </div>
+                <div className="col-12 text-end mt-2">
+                  <button type="button" className="btn btn-sm btn-secondary me-2" onClick={() => setShowVisitForm(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-sm btn-success">Add Visit</button>
+                </div>
+              </form>
+            )}
+
+            {showHealthForm && selectedPat && (
+              <form onSubmit={handleHealthSubmit} className="row g-2 mb-3 bg-light p-3 rounded">
+                <h5>Add Health Tracking for {selectedPat.full_name}</h5>
+                <div className="col-md-4"><label className="form-label">Measured On</label><input type="datetime-local" className="form-control" value={healthForm.measured_at} onChange={e => setHealthForm({ ...healthForm, measured_at: e.target.value })} required /></div>
+                <div className="col-md-4"><label className="form-label">Heart Rate (bpm)</label><input type="number" min="0" className="form-control" value={healthForm.heart_rate} onChange={e => setHealthForm({ ...healthForm, heart_rate: e.target.value })} /></div>
+                <div className="col-md-4"><label className="form-label">Blood Sugar (mg/dL)</label><input type="number" min="0" className="form-control" value={healthForm.blood_sugar} onChange={e => setHealthForm({ ...healthForm, blood_sugar: e.target.value })} /></div>
+                <div className="col-md-6"><label className="form-label">Blood Pressure</label><input type="text" placeholder="e.g. 120/80" className="form-control" value={healthForm.blood_pressure} onChange={e => setHealthForm({ ...healthForm, blood_pressure: e.target.value })} /></div>
+                <div className="col-md-6"><label className="form-label">BMI</label><input type="number" min="0" step="0.01" className="form-control" value={healthForm.bmi} onChange={e => setHealthForm({ ...healthForm, bmi: e.target.value })} /></div>
+                <div className="col-12 text-end mt-2"><button type="button" className="btn btn-sm btn-secondary me-2" onClick={() => setShowHealthForm(false)}>Cancel</button><button type="submit" className="btn btn-sm btn-success">Save Health Tracking</button></div>
+              </form>
+            )}
+
+            <div className="mb-3">
+              <input
+                type="search"
+                className="form-control"
+                placeholder="Search by patient name or mobile number"
+                value={patientSearch}
+                onChange={(e) => setPatientSearch(e.target.value)}
+              />
+            </div>
+
             {loading ? (
               <div className="text-center py-4">Loading directory...</div>
-            ) : patients.length === 0 ? (
+            ) : filteredPatients.length === 0 ? (
               <div className="text-muted">No patients registered.</div>
             ) : (
-              <div className="table-responsive" style={{ maxHeight: '400px' }}>
+              <>
+              <div className="staff-patient-table">
                 <table className="table align-middle" style={{ fontSize: '13px' }}>
                   <thead>
                     <tr>
@@ -2868,43 +2614,72 @@ function StaffDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {patients.map(p => (
+                    {filteredPatients.map(p => (
                       <tr key={p.id}>
                         <td><strong>{p.full_name}</strong></td>
                         <td>{p.phone}</td>
                         <td>
-                          <div className="dropdown">
-                            <button className="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                              Manage
-                            </button>
-                            <ul className="dropdown-menu">
-                              <li>
-                                <button className="dropdown-item" onClick={() => {
-                                  setSelectedPat(p);
-                                  setPatForm({ full_name: p.full_name, email: p.email, phone: p.phone, password: '' });
-                                  setShowAddForm(true);
-                                }}>Edit Info</button>
-                              </li>
-                              <li>
-                                <button className="dropdown-item" onClick={() => {
-                                  setSelectedPat(p);
-                                  setShowReportForm(true);
-                                }}>Upload Document</button>
-                              </li>
-                              <li>
-                                <button className="dropdown-item" onClick={() => {
-                                  setSelectedPat(p);
-                                  setShowApptForm(true);
-                                }}>Book Visit</button>
-                              </li>
-                            </ul>
-                          </div>
+                          <button
+                            className={`btn btn-sm ${actionPatient?.id === p.id ? 'btn-primary' : 'btn-outline-primary'}`}
+                            type="button"
+                            onClick={() => setActionPatient(actionPatient?.id === p.id ? null : p)}
+                            aria-expanded={actionPatient?.id === p.id}
+                          >
+                            {actionPatient?.id === p.id ? 'Close actions' : 'Manage'}
+                          </button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              {actionPatient && (
+                <section className="patient-action-panel" aria-label={`Actions for ${actionPatient.full_name}`}>
+                  <div className="patient-action-panel__heading">
+                    <div>
+                      <span>Selected patient</span>
+                      <strong>{actionPatient.full_name}</strong>
+                      <small>{actionPatient.phone}</small>
+                    </div>
+                    <button className="icon-btn" type="button" aria-label="Close patient actions" onClick={() => setActionPatient(null)}><X size={18} /></button>
+                  </div>
+                  <div className="patient-action-panel__buttons">
+                    <button className="btn btn-sm btn-outline-primary" onClick={() => {
+                      setSelectedPat(actionPatient);
+                      setShowHealthForm(true);
+                      setHealthForm({ heart_rate: '', blood_sugar: '', blood_pressure: '', bmi: '', measured_at: '' });
+                      setActionPatient(null);
+                    }}>Health tracking</button>
+                    <button className="btn btn-sm btn-outline-primary" onClick={() => {
+                      setSelectedPat(actionPatient);
+                      setPatForm({ full_name: actionPatient.full_name, email: actionPatient.email, phone: actionPatient.phone, password: '' });
+                      setShowAddForm(true);
+                      setActionPatient(null);
+                    }}>Edit details</button>
+                    <button className="btn btn-sm btn-outline-primary" onClick={() => {
+                      setSelectedPat(actionPatient);
+                      setShowReportForm(true);
+                      setActionPatient(null);
+                    }}>Upload document</button>
+                    <button className="btn btn-sm btn-outline-primary" onClick={() => {
+                      setSelectedPat(actionPatient);
+                      setShowVisitForm(true);
+                      setVisitForm({ visit_date: '', description: '' });
+                      setActionPatient(null);
+                    }}>Add visit</button>
+                    <button className="btn btn-sm btn-primary" onClick={() => {
+                      setSelectedPat(actionPatient);
+                      setShowApptForm(true);
+                      setActionPatient(null);
+                    }}>Schedule appointment</button>
+                    <button className="btn btn-sm btn-outline-danger" onClick={() => {
+                      setActionPatient(null);
+                      handlePatientDelete(actionPatient);
+                    }}>Delete patient</button>
+                  </div>
+                </section>
+              )}
+              </>
             )}
           </Card>
         </div>
@@ -2939,6 +2714,24 @@ function StaffDashboard() {
               </div>
             )}
           </Card>
+          <Card className="mt-4">
+            <h3 className="mb-3">Recent Visit Notes</h3>
+            {loading ? (
+              <div className="text-center py-3">Loading visits...</div>
+            ) : visits.length === 0 ? (
+              <div className="text-muted">No visit notes recorded.</div>
+            ) : (
+              <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                {visits.map((visit) => (
+                  <div key={visit.visit_id} className="p-2 mb-2 border rounded" style={{ fontSize: '13px' }}>
+                    <strong>{visit.patient_name}</strong>
+                    <div className="text-muted">{new Date(visit.visit_date).toLocaleString()}</div>
+                    <div>{visit.description}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
         </div>
       </div>
     </PageShell>
@@ -2949,8 +2742,9 @@ function StaffDashboard() {
 // PATIENT PROFILE ENHANCEMENT
 // ==========================================
 
-function ProfileScreen() {
+function LegacyProfileScreen() {
   const [profile, setProfile] = useState(null);
+  const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: '', message: '' });
 
@@ -2964,6 +2758,13 @@ function ProfileScreen() {
       .catch((err) => setStatus({ type: 'error', message: err.message }))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (profile?.role !== 'PATIENT') return;
+    apiRequest('/patient/visits')
+      .then((data) => setVisits(data.visits || []))
+      .catch((err) => console.error('Error loading patient visits:', err));
+  }, [profile?.role]);
 
   const handleUpdate = async (e) => {
     e.preventDefault();
@@ -3004,6 +2805,27 @@ function ProfileScreen() {
           <p>{profile.role?.replace('_', ' ')} • {profile.email}</p>
         </div>
       </Card>
+
+      {profile.role === 'PATIENT' && (
+        <Card className="mb-4">
+          <h3 className="mb-3">Visit History</h3>
+          {visits.length === 0 ? (
+            <p className="text-muted mb-0">No visits have been recorded yet.</p>
+          ) : (
+            <div className="d-flex flex-column gap-2">
+              {visits.map((visit) => (
+                <div key={visit.visit_id} className="border rounded p-3">
+                  <div className="d-flex justify-content-between gap-3 flex-wrap">
+                    <strong>{new Date(visit.visit_date).toLocaleString()}</strong>
+                    <span className="text-muted">Added by {visit.created_by_name}</span>
+                  </div>
+                  <p className="mb-0 mt-2">{visit.description}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       <Card>
         <h3 className="mb-3">Edit Profile Details</h3>

@@ -1,0 +1,1 @@
+export default function ConfirmationDialog({ open, title, children, onConfirm, onCancel }) { if (!open) return null; return <div role="dialog" aria-modal="true"><h2>{title}</h2><p>{children}</p><button type="button" onClick={onCancel}>Cancel</button><button type="button" onClick={onConfirm}>Confirm</button></div>; }

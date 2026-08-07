@@ -4,15 +4,16 @@ import { BrowserRouter } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './styles.css';
 import App from './App.jsx';
+import { AuthProvider } from './context/AuthContext.jsx';
 
 class AppErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
   }
 
   componentDidCatch(error) {
@@ -26,6 +27,9 @@ class AppErrorBoundary extends React.Component {
           <HeartFallback />
           <h1>Smart Health</h1>
           <p>The app could not render. Please refresh the page or restart the dev server.</p>
+          {import.meta.env.DEV && this.state.error?.message ? (
+            <pre className="mt-3 text-danger text-wrap">{this.state.error.message}</pre>
+          ) : null}
         </main>
       );
     }
@@ -49,7 +53,7 @@ createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <AppErrorBoundary>
       <BrowserRouter>
-        <App />
+        <AuthProvider><App /></AuthProvider>
       </BrowserRouter>
     </AppErrorBoundary>
   </React.StrictMode>,

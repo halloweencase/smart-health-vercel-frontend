@@ -18,6 +18,71 @@
   --radius-xl: 24px;
 }
 
+/* Staff directory: actions live in a dedicated panel instead of a clipped table dropdown. */
+.staff-patient-table {
+  max-height: 320px;
+  overflow: auto;
+}
+
+.staff-patient-table table {
+  margin-bottom: 0;
+}
+
+.staff-patient-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #ffffff;
+}
+
+.patient-action-panel {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.patient-action-panel__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.patient-action-panel__heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.patient-action-panel__heading span,
+.patient-action-panel__heading small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.patient-action-panel__heading strong {
+  font-size: 16px;
+}
+
+.patient-action-panel__heading .icon-btn {
+  width: 34px;
+  height: 34px;
+}
+
+.patient-action-panel__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 460px) {
+  .patient-action-panel__buttons .btn {
+    width: 100%;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
