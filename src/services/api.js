@@ -32,7 +32,12 @@ export const handleFileUpload = async (event, callback, setUploadingState) => {
   try {
     const response = await fetch(`${API_BASE_URL}/upload`, { method: 'POST', headers: { Authorization: getStoredToken() ? `Bearer ${getStoredToken()}` : '' }, body: formData });
     const data = await response.json();
-    if (data.success) callback(data.file_url); else alert(data.message || 'File upload failed');
+    const fileUrl = typeof data.file_url === 'string' ? data.file_url.trim() : '';
+    if (data.success && fileUrl && !/\/undefined(?:[/?#]|$)/i.test(fileUrl)) {
+      callback(fileUrl);
+    } else {
+      alert(data.message || 'The upload server returned an invalid file URL. Deploy the latest backend, then upload again.');
+    }
   } catch (error) { console.error('Error uploading file:', error); alert('Error uploading file from local'); }
   finally { setUploadingState(false); }
 };
