@@ -546,7 +546,9 @@ function ReportDetailsScreen() {
   const location = useLocation();
   const navigate = useNavigate();
   const report = location.state?.report;
-  const fileUrl = report?.file_url;
+  const fileUrl = report?.file_url ? getSecureDocumentUrl(report.file_url) : null;
+  const [failedPreviewUrl, setFailedPreviewUrl] = useState(null);
+  const previewFailed = failedPreviewUrl === fileUrl;
   const fileExtension = fileUrl?.split(/[?#]/)[0].split('.').pop()?.toLowerCase();
   const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(fileExtension);
   const isPdf = fileExtension === 'pdf';
@@ -567,24 +569,24 @@ function ReportDetailsScreen() {
       title="Document View"
       actions={
         <>
-          {report.file_url ? (
-            <a href={report.file_url} target="_blank" rel="noreferrer" className="icon-btn" title="Download">
+          {fileUrl ? (
+            <a href={fileUrl} target="_blank" rel="noreferrer" className="icon-btn" title="Download">
               <Download size={22} />
             </a>
           ) : null}
         </>
       }
     >
-      <section className={`document-viewer${fileUrl && (isPdf || isImage) ? ' document-viewer--file' : ''}`} aria-label="Document preview">
+      <section className={`document-viewer${fileUrl && (isPdf || isImage) ? ' document-viewer--file' : ''}`} aria-label="Document preview" data-document-title={report.title}>
         {isPdf ? (
           <iframe className="document-viewer__pdf" src={fileUrl} title={`${report.title} preview`} />
-        ) : isImage ? (
-          <img className="document-viewer__image" src={fileUrl} alt={`${report.title} preview`} />
+        ) : isImage && !previewFailed ? (
+          <img className="document-viewer__image" src={fileUrl} alt={`${report.title} preview`} onError={() => setFailedPreviewUrl(fileUrl)} />
         ) : (
           <div className="document-viewer__fallback">
             <div className="pdf-doc"><FileText size={52} /></div>
             <h2>{report.title}</h2>
-            <p>{fileUrl ? 'Preview is not available for this file type.' : 'No file was attached to this report.'}</p>
+            <p>{previewFailed ? 'The file could not be loaded. You can still try to open or download it.' : fileUrl ? 'Preview is not available for this file type.' : 'No file was attached to this report.'}</p>
             {fileUrl ? <a href={fileUrl} target="_blank" rel="noreferrer" className="primary-btn"><Download size={18} /> Open or download file</a> : null}
           </div>
         )}
@@ -610,6 +612,22 @@ function ReportDetailsScreen() {
       </Card>
     </PageShell>
   );
+}
+
+function getSecureDocumentUrl(value) {
+  try {
+    const url = new URL(value, window.location.origin);
+    if (
+      url.protocol === 'http:' &&
+      window.location.protocol === 'https:' &&
+      !['localhost', '127.0.0.1'].includes(url.hostname)
+    ) {
+      url.protocol = 'https:';
+    }
+    return url.toString();
+  } catch {
+    return value;
+  }
 }
 
 function DetailRow({ label, value }) {
