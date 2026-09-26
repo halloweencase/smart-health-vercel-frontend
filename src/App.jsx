@@ -55,7 +55,6 @@ import { routes, getNavigationItems } from './constants/routes';
 import { API_BASE_URL, apiRequest, authRequest, clearSession, getStoredToken, getStoredUser, handleFileUpload, saveSession } from './services/api';
 import { AppLogo, Card, Field, PrimaryButton, StatusMessage } from './components/ui';
 import { PageShell, ProtectedRoute, useStoredUser } from './components/layout';
-import ProfilePage from './pages/ProfilePage';
 
 function App() {
   return (
@@ -72,7 +71,7 @@ function App() {
       <Route path={routes.health} element={<ProtectedRoute><HealthScreen /></ProtectedRoute>} />
       <Route path={routes.appointments} element={<ProtectedRoute><AppointmentsScreen /></ProtectedRoute>} />
       <Route path={routes.ai} element={<ProtectedRoute><AiAssistantScreen /></ProtectedRoute>} />
-      <Route path={routes.profile} element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+      <Route path={routes.profile} element={<ProtectedRoute><LegacyProfileScreen /></ProtectedRoute>} />
       <Route path={routes.settings} element={<ProtectedRoute><SettingsScreen /></ProtectedRoute>} />
       <Route path={routes.statistics} element={<ProtectedRoute><StatisticsScreen /></ProtectedRoute>} />
       <Route path={routes.hospitalAdmins} element={<ProtectedRoute><HospitalAdminsScreen /></ProtectedRoute>} />
