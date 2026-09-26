@@ -18,6 +18,12 @@
   --radius-xl: 24px;
 }
 
+/* Staff directory: keep actions accessible without table scrollbars clipping the menu. */
+.staff-patient-table { overflow-x: visible; position: relative; }
+.staff-actions-menu { position: relative; }
+.staff-actions-menu .dropdown-menu { min-width: 12.5rem; z-index: 1080; box-shadow: 0 0.5rem 1rem rgba(20, 32, 60, 0.14); }
+.staff-actions-menu .dropdown-item { padding: 0.55rem 0.9rem; white-space: nowrap; }
+
 * {
   box-sizing: border-box;
 }
@@ -41,6 +47,11 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+input[type="file"].form-control {
+  min-height: 48px;
+  touch-action: manipulation;
 }
 
 a {
