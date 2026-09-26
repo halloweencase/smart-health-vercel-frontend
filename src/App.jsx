@@ -546,6 +546,10 @@ function ReportDetailsScreen() {
   const location = useLocation();
   const navigate = useNavigate();
   const report = location.state?.report;
+  const fileUrl = report?.file_url;
+  const fileExtension = fileUrl?.split(/[?#]/)[0].split('.').pop()?.toLowerCase();
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(fileExtension);
+  const isPdf = fileExtension === 'pdf';
 
   if (!report) {
     return (
@@ -571,12 +575,19 @@ function ReportDetailsScreen() {
         </>
       }
     >
-      <section className="preview-panel">
-        <div className="pdf-doc">
-          <FileText size={52} />
-        </div>
-        <h2>{report.title}</h2>
-        <p>{report.category}</p>
+      <section className={`document-viewer${fileUrl && (isPdf || isImage) ? ' document-viewer--file' : ''}`} aria-label="Document preview">
+        {isPdf ? (
+          <iframe className="document-viewer__pdf" src={fileUrl} title={`${report.title} preview`} />
+        ) : isImage ? (
+          <img className="document-viewer__image" src={fileUrl} alt={`${report.title} preview`} />
+        ) : (
+          <div className="document-viewer__fallback">
+            <div className="pdf-doc"><FileText size={52} /></div>
+            <h2>{report.title}</h2>
+            <p>{fileUrl ? 'Preview is not available for this file type.' : 'No file was attached to this report.'}</p>
+            {fileUrl ? <a href={fileUrl} target="_blank" rel="noreferrer" className="primary-btn"><Download size={18} /> Open or download file</a> : null}
+          </div>
+        )}
       </section>
       <Card className="details-card">
         <h2>Document details</h2>

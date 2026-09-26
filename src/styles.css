@@ -883,6 +883,61 @@ button.custom-card:hover {
   background: var(--surface);
 }
 
+.document-viewer {
+  min-height: 280px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.document-viewer--file {
+  min-height: min(72vh, 820px);
+}
+
+.document-viewer__pdf {
+  display: block;
+  width: 100%;
+  height: min(72vh, 820px);
+  min-height: 520px;
+  border: 0;
+  background: #e8edf4;
+}
+
+.document-viewer__image {
+  display: block;
+  width: 100%;
+  height: min(72vh, 820px);
+  object-fit: contain;
+  background: #f1f5f9;
+}
+
+.document-viewer__fallback {
+  min-height: 280px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+}
+
+.document-viewer__fallback h2,
+.document-viewer__fallback p {
+  margin: 0;
+}
+
+.document-viewer__fallback p {
+  color: var(--text-secondary);
+}
+
+.document-viewer__fallback .primary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .pdf-doc {
   display: grid;
   place-items: center;
